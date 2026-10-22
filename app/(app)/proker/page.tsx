@@ -8,7 +8,7 @@ import type { StatusProker } from '@/lib/rules/proker';
 type Search = { tahun?: string; lembaga?: string; bidang?: string; status?: string; tim?: string; misi?: string; milestone?: string };
 type TeamInfo = { id: string; nama: string; bidang_id: string; bidang: { nama: string; lembaga_id: string; lembaga: { nama: string } } };
 type ProkerRow = { id: string; tim_kerja_id: string; tahun_program: number; jenis: string; status: string; status_efektif: StatusProker; nama_kegiatan: string; tanggal_mulai: string; tanggal_selesai: string; rentang_waktu: boolean; created_at: string };
-type BudgetRow = { proker_id: string; nominal: string | number };
+type BudgetRow = { proker_id: string; jumlah_item: number; harga_satuan: string | number };
 const statuses: StatusProker[] = ['menunggu', 'ditinjau', 'disetujui', 'ditolak', 'direvisi'];
 
 function tanggal(value: string): string {
@@ -52,13 +52,14 @@ export default async function ProkerPage({ searchParams }: { searchParams: Promi
   const { data, error } = await query;
   const rows = (data ?? []) as ProkerRow[];
   const ids = rows.map((row) => row.id);
-  const budgetResult = ids.length ? await supabase.from('proker_anggaran').select('proker_id,nominal').in('proker_id', ids) : { data: [], error: null };
+  const budgetResult = ids.length ? await supabase.from('proker_anggaran').select('proker_id,jumlah_item,harga_satuan').in('proker_id', ids) : { data: [], error: null };
   const totalByProker = new Map<string, string>();
+  const budgetsByProker = new Map<string, BudgetRow[]>();
   for (const row of budgetResult.data ?? []) {
     const item = row as BudgetRow;
-    const current = totalByProker.get(item.proker_id) ?? '0.00';
-    totalByProker.set(item.proker_id, hitungTotalAnggaran([{ nominal: current }, { nominal: item.nominal }]));
+    budgetsByProker.set(item.proker_id, [...(budgetsByProker.get(item.proker_id) ?? []), item]);
   }
+  for (const [prokerId, items] of budgetsByProker) totalByProker.set(prokerId, hitungTotalAnggaran(items));
   const teamName = (id: string) => {
     const team = teamById.get(id);
     return isAdmin && team ? `${team.bidang.lembaga.nama} · ${team.bidang.nama} · ${team.nama}` : profile.tim_kerja.nama;

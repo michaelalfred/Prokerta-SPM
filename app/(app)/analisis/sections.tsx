@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { combineAchievement, compliancePercent, groupByDivision, sumStatus, type AchievementTeam, type ComplianceTeam, type Status, type StatusTeam } from '@/lib/rules/analisis';
+import { BudgetAnalysisView } from './budget-analysis-view';
+import type { BudgetAnalysisRow } from '@/lib/rules/analisis-anggaran';
 
 type Props={year:number;institutionId:string|null};
 type TeamRef={id:string;nama:string};
@@ -35,6 +37,11 @@ export async function ComplianceSection({year,institutionId}:Props) {
  <div className="grid gap-3">{divisions.map(d=>{const approved=d.rows.reduce((s,r)=>s+count(r.disetujui),0),done=d.rows.reduce((s,r)=>s+count(r.sudah_dievaluasi),0),pending=d.rows.reduce((s,r)=>s+count(r.belum_dievaluasi),0),pct=compliancePercent(done,approved);return <details key={d.id} className="rounded-lg border border-[var(--border)] p-3"><summary className="cursor-pointer"><strong>{d.nama}</strong><span className="ml-2 text-sm">Disetujui {approved} · Dievaluasi {done} · Belum {pending} · {pct===null?'-':`${pct}%`}</span></summary><div className="mt-2 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr>{['Tim Kerja','Disetujui','Dievaluasi','Belum','Persentase'].map(h=><th key={h} className="border-b border-[var(--border)] p-2">{h}</th>)}</tr></thead><tbody>{d.rows.map(r=><tr key={r.tim_kerja_id}><th className="border-b border-[var(--border)] p-2 font-medium">{r.tim_kerja}</th><td className="border-b border-[var(--border)] p-2">{r.disetujui}</td><td className="border-b border-[var(--border)] p-2">{r.sudah_dievaluasi}</td><td className="border-b border-[var(--border)] p-2">{r.belum_dievaluasi}</td><td className="border-b border-[var(--border)] p-2">{compliancePercent(r.sudah_dievaluasi,r.disetujui)===null?'-':`${compliancePercent(r.sudah_dievaluasi,r.disetujui)}%`}</td></tr>)}</tbody></table></div></details>})}</div>
  <h3 className="font-semibold">Belum dievaluasi</h3>{list.length===0?<p className="text-sm text-[var(--muted)]">Semua proker disetujui sudah dievaluasi.</p>:<div className="grid gap-2">{list.map(p=><article key={p.proker_id} className="rounded-lg border border-[var(--border)] p-3 text-sm"><p className="font-medium">{p.tim} · <Link className="underline" href={`/proker/${p.proker_id}`}>{p.nama_kegiatan}</Link></p><p className="text-[var(--muted)]">{dateLabel(p.tanggal_mulai)}{p.tanggal_selesai!==p.tanggal_mulai?` – ${dateLabel(p.tanggal_selesai)}`:''}</p>{p.tanggal_selesai<new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jakarta'})&&<p className="font-medium text-amber-800 dark:text-amber-300">Jadwal sudah lewat</p>}</article>)}</div>}
  </>}</section>;
+}
+
+export async function BudgetSection({year,institutionId}:Props) {
+ const supabase=await createClient(); const {data,error}=await supabase.rpc('analisis_anggaran',{p_tahun:year,p_lembaga:institutionId}); const rows=(data??[]) as BudgetAnalysisRow[];
+ return <section className={panel}><h2 className={heading}>Rencana vs Realisasi Anggaran</h2>{error?<ErrorBox/>:<BudgetAnalysisView rows={rows}/>}</section>;
 }
 
 export async function AchievementSection({year,institutionId}:Props) {

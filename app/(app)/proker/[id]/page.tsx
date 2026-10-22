@@ -10,7 +10,7 @@ import { DeleteProkerForm } from './delete-proker-form';
 import { StatusProkerForm } from './status-proker-form';
 
 type Proker = { id: string; tim_kerja_id: string; tahun_program: number; jenis: string; status: string; status_efektif: StatusProker; misi_id: string | null; milestone_id: string | null; visi_teks: string | null; misi_teks: string | null; outcome_teks: string | null; milestone_teks: string | null; sasaran_program: string; indikator_keberhasilan: string; target: string; nama_kegiatan: string; rentang_waktu: boolean; tanggal_mulai: string; tanggal_selesai: string; penanggung_jawab: string; created_at: string };
-type Budget = { id: string; urutan: number; nama: string; jumlah_item: number; nominal: string | number };
+type Budget = { id: string; urutan: number; nama: string; jumlah_item: number; harga_satuan: string | number };
 
 function tanggal(value: string) { return new Date(`${value}T12:00:00+07:00`).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'long', year: 'numeric' }); }
 function label(value: string) { return value[0].toLocaleUpperCase('id-ID') + value.slice(1); }
@@ -27,18 +27,18 @@ export default async function DetailProkerPage({ params, searchParams }: { param
   const teamResult = await supabase.from('tim_kerja').select('id,nama,bidang(nama,lembaga(nama))').eq('id', proker.tim_kerja_id).single();
   const team = teamResult.data as unknown as { nama: string; bidang: { nama: string; lembaga: { nama: string } } } | null;
   const [budgetResult, evaluationResult] = await Promise.all([
-    supabase.from('proker_anggaran').select('id,urutan,nama,jumlah_item,nominal').eq('proker_id', id).order('urutan'),
+    supabase.from('proker_anggaran').select('id,urutan,nama,jumlah_item,harga_satuan').eq('proker_id', id).order('urutan'),
     supabase.from('evaluasi').select('*').eq('proker_id', id).maybeSingle(),
   ]);
   const budgets = (budgetResult.data ?? []) as Budget[];
-  const total = hitungTotalAnggaran(budgets.length ? budgets : [{ nominal: '0' }]);
+  const total = hitungTotalAnggaran(budgets.length ? budgets : [{ harga_satuan: '0', jumlah_item: 1 }]);
   const allowedEdit = bolehEditProker(profile.role, proker.status_efektif, own);
   const allowedDelete = bolehHapusProker(profile.role, proker.status_efektif, own);
   const allowedStatus = bolehUbahStatus(profile.role, proker.status_efektif);
   const allowedEvaluation = bolehIsiEvaluasi(proker.status_efektif, own, Boolean(evaluationResult.data));
   const evaluation = evaluationResult.data;
   const [realizationResult, filesResult] = evaluation ? await Promise.all([
-    supabase.from('evaluasi_anggaran').select('id,urutan,nama,jumlah_item,nominal').eq('evaluasi_id', evaluation.id).order('urutan'),
+    supabase.from('evaluasi_anggaran').select('id,urutan,nama,jumlah_item,harga_satuan').eq('evaluasi_id', evaluation.id).order('urutan'),
     supabase.from('evaluasi_file').select('nama_file,mime_type,storage_path').eq('evaluasi_id', evaluation.id).order('created_at'),
   ]) : [{ data: [], error: null }, { data: [], error: null }];
   const adminStorage = createAdminClient().storage.from('bukti-evaluasi');
@@ -47,7 +47,7 @@ export default async function DetailProkerPage({ params, searchParams }: { param
     return { ...file, url: signed?.signedUrl ?? null };
   }));
   const realization = (realizationResult.data ?? []) as Budget[];
-  const realizationTotal = hitungTotalAnggaran(realization.length ? realization : [{ nominal: '0' }]);
+  const realizationTotal = hitungTotalAnggaran(realization.length ? realization : [{ harga_satuan: '0', jumlah_item: 1 }]);
 
   return <article className="mx-auto grid min-w-0 max-w-4xl gap-5" aria-labelledby="judul-detail">
     <div className="flex flex-wrap items-center justify-between gap-3"><h1 id="judul-detail" className="text-2xl font-semibold">Detail Proker</h1><Link href="/proker" className="inline-flex min-h-10 items-center rounded-lg border border-[var(--border)] px-4">Kembali ke daftar</Link></div>
@@ -71,7 +71,7 @@ export default async function DetailProkerPage({ params, searchParams }: { param
       <p className="break-words"><strong>Waktu Pelaksanaan:</strong><br />{proker.rentang_waktu ? `${tanggal(proker.tanggal_mulai)} – ${tanggal(proker.tanggal_selesai)}` : tanggal(proker.tanggal_mulai)}</p>
       <p className="break-words"><strong>Penanggung Jawab (PJ):</strong><br />{proker.penanggung_jawab}</p>
     </section>
-    <section className="grid min-w-0 max-w-full gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6"><h2 className="text-lg font-semibold">Rincian Biaya</h2><div className="grid gap-2">{budgets.map((item) => <div key={item.id} className="grid min-w-0 gap-1 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-[1fr_auto_auto]"><span className="break-words">{item.nama}</span><span>Jumlah item: {item.jumlah_item}</span><span>{formatRupiah(String(item.nominal))}</span></div>)}</div><p className="text-right text-lg font-semibold">Total Anggaran: {formatRupiah(total)}</p></section>
+    <section className="grid min-w-0 max-w-full gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6"><h2 className="text-lg font-semibold">Rincian Biaya</h2><div className="grid gap-2">{budgets.map((item) => <div key={item.id} className="grid min-w-0 gap-1 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-[1fr_auto_auto]"><span className="break-words">{item.nama}</span><span>Jumlah item: {item.jumlah_item}</span><span>Harga satuan: {formatRupiah(String(item.harga_satuan))}</span><span>Subtotal: {formatRupiah(hitungTotalAnggaran([item]))}</span></div>)}</div><p className="text-right text-lg font-semibold">Total Anggaran: {formatRupiah(total)}</p></section>
     {evaluationResult.error || budgetResult.error || teamResult.error || realizationResult.error || filesResult.error ? <p role="alert" className="text-red-700">Sebagian data proker tidak dapat dimuat.</p> : null}
     <section className="flex flex-wrap gap-3" aria-label="Aksi proker">
       {allowedEdit && <Link href={`/proker/${id}/edit`} className="inline-flex min-h-10 items-center rounded-lg border border-[var(--border)] px-4">Edit</Link>}
@@ -80,6 +80,6 @@ export default async function DetailProkerPage({ params, searchParams }: { param
       {allowedEvaluation && <Link href={`/proker/${id}/evaluasi/baru`} className="inline-flex min-h-10 items-center rounded-lg bg-green-700 px-4 text-white">Isi Evaluasi</Link>}
       {profile.role !== 'user' && proker.status_efektif === 'direvisi' && <StatusProkerForm id={id} currentStatus={proker.status_efektif} completeRevision />}
     </section>
-    {evaluation && <section className="grid min-w-0 max-w-full gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6"><h2 className="text-lg font-semibold">Evaluasi (read-only)</h2><p className="break-words"><strong>Hasil Kegiatan:</strong><br />{evaluation.hasil_kegiatan}</p><p><strong>Capaian:</strong> {evaluation.capaian_persen}%</p><p><strong>Waktu Pelaksanaan:</strong> {evaluation.rentang_waktu ? `${tanggal(evaluation.tanggal_mulai)} – ${tanggal(evaluation.tanggal_selesai)}` : tanggal(evaluation.tanggal_mulai)}</p>{evaluation.keterangan_tambahan && <p className="break-words"><strong>Keterangan Tambahan:</strong><br />{evaluation.keterangan_tambahan}</p>}<h3 className="font-semibold">Realisasi Anggaran</h3>{realization.map((item) => <div key={item.id} className="grid min-w-0 gap-1 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-[1fr_auto_auto]"><span className="break-words">{item.nama}</span><span>Jumlah item: {item.jumlah_item}</span><span>{formatRupiah(String(item.nominal))}</span></div>)}<p className="text-right font-semibold">Total Realisasi: {formatRupiah(realizationTotal)}</p>{proofFiles.length>0 && <><h3 className="font-semibold">Foto / Bukti</h3><div className="grid gap-3 sm:grid-cols-2">{proofFiles.map((file) => <div key={file.storage_path} className="grid gap-2">{file.url && file.mime_type.startsWith('image/') ? <a href={file.url} target="_blank" rel="noreferrer"><Image unoptimized width={640} height={480} src={file.url} alt={file.nama_file} className="max-h-72 w-auto max-w-full rounded-lg object-contain" /></a> : file.url ? <a className="break-all text-blue-700 underline dark:text-blue-300" href={file.url} target="_blank" rel="noreferrer">Buka PDF: {file.nama_file}</a> : <span>{file.nama_file} (tidak dapat dibuka)</span>}</div>)}</div></>}</section>}
+    {evaluation && <section className="grid min-w-0 max-w-full gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6"><h2 className="text-lg font-semibold">Evaluasi (read-only)</h2><p className="break-words"><strong>Hasil Kegiatan:</strong><br />{evaluation.hasil_kegiatan}</p><p><strong>Capaian:</strong> {evaluation.capaian_persen}%</p><p><strong>Waktu Pelaksanaan:</strong> {evaluation.rentang_waktu ? `${tanggal(evaluation.tanggal_mulai)} – ${tanggal(evaluation.tanggal_selesai)}` : tanggal(evaluation.tanggal_mulai)}</p>{evaluation.keterangan_tambahan && <p className="break-words"><strong>Keterangan Tambahan:</strong><br />{evaluation.keterangan_tambahan}</p>}<h3 className="font-semibold">Realisasi Anggaran</h3>{realization.map((item) => <div key={item.id} className="grid min-w-0 gap-1 rounded-lg border border-[var(--border)] p-3 sm:grid-cols-[1fr_auto_auto]"><span className="break-words">{item.nama}</span><span>Jumlah item: {item.jumlah_item}</span><span>Harga satuan: {formatRupiah(String(item.harga_satuan))}</span><span>Subtotal: {formatRupiah(hitungTotalAnggaran([item]))}</span></div>)}<p className="text-right font-semibold">Total Realisasi: {formatRupiah(realizationTotal)}</p>{proofFiles.length>0 && <><h3 className="font-semibold">Foto / Bukti</h3><div className="grid gap-3 sm:grid-cols-2">{proofFiles.map((file) => <div key={file.storage_path} className="grid gap-2">{file.url && file.mime_type.startsWith('image/') ? <a href={file.url} target="_blank" rel="noreferrer"><Image unoptimized width={640} height={480} src={file.url} alt={file.nama_file} className="max-h-72 w-auto max-w-full rounded-lg object-contain" /></a> : file.url ? <a className="break-all text-blue-700 underline dark:text-blue-300" href={file.url} target="_blank" rel="noreferrer">Buka PDF: {file.nama_file}</a> : <span>{file.nama_file} (tidak dapat dibuka)</span>}</div>)}</div></>}</section>}
   </article>;
 }

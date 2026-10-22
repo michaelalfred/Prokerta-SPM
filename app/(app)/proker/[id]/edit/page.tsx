@@ -16,7 +16,7 @@ export default async function EditProkerPage({ params }: { params: Promise<{ id:
   const proker = data as unknown as SavedProker;
   if (!bolehEditProker(profile.role, proker.status_efektif, proker.tim_kerja_id === profile.tim_kerja_id)) redirect(`/proker/${id}`);
   const [budgetsResult, missionsResult, milestonesResult] = await Promise.all([
-    supabase.from('proker_anggaran').select('id,nama,jumlah_item,nominal').eq('proker_id', id).order('urutan'),
+    supabase.from('proker_anggaran').select('id,nama,jumlah_item,harga_satuan').eq('proker_id', id).order('urutan'),
     supabase.from('misi').select('id,nomor,teks,outcome').order('nomor'),
     supabase.from('milestone').select('id,misi_id,nomor,teks').order('nomor'),
   ]);

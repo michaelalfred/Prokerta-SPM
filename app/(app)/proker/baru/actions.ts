@@ -54,7 +54,7 @@ export async function simpanProker(_state: HasilSimpanProker, form: FormData): P
     dataAnggaran = null;
   }
   const anggaran = validasiItemAnggaran(dataAnggaran);
-  if (!anggaran) return { error: 'Isi minimal satu rincian biaya dengan nama, jumlah item bilangan bulat lebih dari nol, dan nominal nol atau lebih (maksimal dua desimal).' };
+  if (!anggaran) return { error: 'Isi minimal satu rincian biaya dengan nama, jumlah item bilangan bulat lebih dari nol, dan harga satuan nol atau lebih (maksimal dua desimal).' };
   const total = hitungTotalAnggaran(anggaran);
 
   if (jenis === 'visioner' && (!misi_id || !milestone_id)) {
@@ -81,7 +81,7 @@ export async function simpanProker(_state: HasilSimpanProker, form: FormData): P
   if (error) {
     const pesanDikenal = [
       'Dalam periode input', 'Di luar periode input', 'Data Visi-Misi', 'Pilih Misi', 'Pilih Milestone',
-      'Semua field', 'Periksa tanggal', 'Rincian biaya', 'Nama dan jumlah', 'Jumlah item', 'Nominal anggaran',
+      'Semua field', 'Periksa tanggal', 'Rincian biaya', 'Nama dan jumlah', 'Jumlah item', 'Harga satuan anggaran',
     ];
     return { error: pesanDikenal.some((pesan) => error.message.includes(pesan)) ? error.message : 'Proker tidak dapat disimpan. Periksa data lalu coba lagi.' };
   }

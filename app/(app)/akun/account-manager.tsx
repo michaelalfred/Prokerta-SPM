@@ -25,6 +25,9 @@ function SelectBidang({ lembagaId, bidangId, institutions, divisions, onChange }
 
 export function AccountManager({ accounts, institutions, divisions }: { accounts: Account[]; institutions: Institution[]; divisions: Division[] }) {
   const [selectedPassword, setSelectedPassword] = useState('');
+  const [accountInstitution, setAccountInstitution] = useState('');
+  const [accountDivision, setAccountDivision] = useState('');
+  const [showAllAccounts, setShowAllAccounts] = useState(false);
   const [newInstitution, setNewInstitution] = useState('');
   const [newDivision, setNewDivision] = useState('');
   const [newError, setNewError] = useState('');
@@ -43,7 +46,17 @@ export function AccountManager({ accounts, institutions, divisions }: { accounts
       <div className="sm:col-span-2"><SelectBidang lembagaId={newInstitution} bidangId={newDivision} institutions={institutions} divisions={divisions} onChange={(value) => { if (value.startsWith('bidang:')) setNewDivision(value.slice(7)); else { setNewInstitution(value); setNewDivision(''); } }} /></div>
       <label className="grid gap-1 text-sm">Nama tim kerja<input name="nama_tim" required /></label><label className="grid gap-1 text-sm">Username<input name="username" pattern="[a-z0-9._-]+" autoCapitalize="none" required /></label><label className="grid gap-1 text-sm">Nama koordinator<input name="nama_koordinator" /></label><label className="grid gap-1 text-sm">Peran<select name="role" defaultValue="user"><option value="user">Pengguna</option><option value="admin">Admin</option></select></label><input type="hidden" name="lembaga_id" value={newInstitution} /><button className="min-h-10 rounded-lg bg-blue-700 px-4 text-white sm:col-span-2 sm:justify-self-start">Buat akun</button><div className="sm:col-span-2"><Feedback message={newError || newMessage} /></div>
     </form></section>
-    <section className="mt-7"><h2 className="mb-3 text-lg font-semibold">Daftar akun</h2><div className="grid gap-3">{accounts.map((account) => <AccountCard key={account.id} account={account} institutions={institutions} divisions={divisions} onPassword={setSelectedPassword} />)}</div></section>
+    <section className="mt-7">
+      <h2 className="mb-3 text-lg font-semibold">Daftar akun</h2>
+      <div className="mb-4 grid gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <label className="grid gap-1 text-sm">Lembaga<select value={accountInstitution} onChange={(event) => { setAccountInstitution(event.target.value); setAccountDivision(''); setShowAllAccounts(false); }}><option value="">Pilih lembaga</option>{institutions.map((row) => <option key={row.id} value={row.id}>{row.nama}</option>)}</select></label>
+        <label className="grid gap-1 text-sm">Bidang<select value={accountDivision} onChange={(event) => { setAccountDivision(event.target.value); setShowAllAccounts(false); }} disabled={!accountInstitution}><option value="">Pilih bidang</option>{divisions.filter((row) => row.lembaga_id === accountInstitution).map((row) => <option key={row.id} value={row.id}>{row.nama}</option>)}</select></label>
+        <button type="button" onClick={() => { setShowAllAccounts(true); setAccountInstitution(''); setAccountDivision(''); }} className="min-h-10 rounded-lg border border-[var(--border)] px-4 text-sm">Tampilkan semua akun</button>
+      </div>
+      {showAllAccounts ? <div className="grid gap-3">{accounts.map((account) => <AccountCard key={account.id} account={account} institutions={institutions} divisions={divisions} onPassword={setSelectedPassword} />)}</div>
+        : accountInstitution && accountDivision ? <div className="grid gap-3">{accounts.filter((account) => account.tim.lembaga_id === accountInstitution && account.tim.bidang_id === accountDivision).map((account) => <AccountCard key={account.id} account={account} institutions={institutions} divisions={divisions} onPassword={setSelectedPassword} />)}</div>
+          : <p className="rounded-xl border border-dashed border-[var(--border)] p-5 text-sm text-[var(--muted)]">Pilih lembaga dan bidang untuk melihat akun, atau pilih “Tampilkan semua akun”.</p>}
+    </section>
     <PasswordDialog password={selectedPassword} close={() => setSelectedPassword('')} />
   </>;
 }

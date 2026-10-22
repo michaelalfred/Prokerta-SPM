@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { AchievementSection, ComplianceSection, MissionSection, StatusSection } from './sections';
+import { AchievementSection, BudgetSection, ComplianceSection, MissionSection, StatusSection } from './sections';
 
 type Search = { tahun?: string; lembaga?: string };
 type Period = { tahun_program: number; tanggal_mulai: string; tanggal_selesai: string };
@@ -31,6 +31,7 @@ export default async function AnalisisPage({ searchParams }: { searchParams: Pro
     {!hasProker ? <p className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">Belum ada data untuk tahun program ini.</p> : <>
       <Suspense fallback={<Loading title="Ringkasan Status"/>}><StatusSection year={year} institutionId={institutionId}/></Suspense>
       <Suspense fallback={<Loading title="Kepatuhan Evaluasi"/>}><ComplianceSection year={year} institutionId={institutionId}/></Suspense>
+      <Suspense fallback={<Loading title="Rencana vs Realisasi Anggaran"/>}><BudgetSection year={year} institutionId={institutionId}/></Suspense>
       <Suspense fallback={<Loading title="Capaian per Bidang"/>}><AchievementSection year={year} institutionId={institutionId}/></Suspense>
       <Suspense fallback={<Loading title="Peta Misi-Milestone"/>}><MissionSection year={year} institutionId={institutionId}/></Suspense>
     </>}

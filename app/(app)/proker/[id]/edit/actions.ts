@@ -33,7 +33,7 @@ export async function simpanEditProker(_state: HasilSimpanProker, form: FormData
   let rawBudget: unknown;
   try { rawBudget = JSON.parse(ambil(form, 'anggaran')); } catch { rawBudget = null; }
   const anggaran = validasiItemAnggaran(rawBudget);
-  if (!anggaran) return { error: 'Isi minimal satu rincian biaya dengan nama, jumlah item bilangan bulat lebih dari nol, dan nominal nol atau lebih (maksimal dua desimal).' };
+  if (!anggaran) return { error: 'Isi minimal satu rincian biaya dengan nama, jumlah item bilangan bulat lebih dari nol, dan harga satuan nol atau lebih (maksimal dua desimal).' };
   const { error } = await supabase.rpc('ubah_proker_dengan_anggaran', {
     p_id: id,
     p_sasaran_program: values.sasaran_program,

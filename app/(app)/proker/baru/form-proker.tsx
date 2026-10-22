@@ -26,7 +26,7 @@ type BarisAnggaran = {
   id: number;
   nama: string;
   jumlah_item: string;
-  nominal: string;
+  harga_satuan: string;
 };
 const initialState: HasilSimpanProker = {};
 
@@ -52,16 +52,16 @@ export function FormProker({
   const [milestoneId, setMilestoneId] = useState('');
   const [nomorBaris, setNomorBaris] = useState(1);
   const [anggaran, setAnggaran] = useState<BarisAnggaran[]>([
-    { id: 0, nama: '', jumlah_item: '1', nominal: '' },
+    { id: 0, nama: '', jumlah_item: '1', harga_satuan: '' },
   ]);
   const misiDipilih = misi.find((item) => item.id === misiId);
   let totalTampilan = '—';
   try {
     totalTampilan = formatRupiah(
-      hitungTotalAnggaran(anggaran.map((item) => ({ nominal: item.nominal }))),
+      hitungTotalAnggaran(anggaran.map((item) => ({ harga_satuan: item.harga_satuan, jumlah_item: Number(item.jumlah_item) || 1 }))),
     );
   } catch {
-    totalTampilan = 'Isi nominal yang valid';
+    totalTampilan = 'Isi harga satuan yang valid';
   }
 
   function ubahAnggaran(
@@ -77,7 +77,7 @@ export function FormProker({
   function tambahAnggaran() {
     setAnggaran((rows) => [
       ...rows,
-      { id: nomorBaris, nama: '', jumlah_item: '1', nominal: '' },
+      { id: nomorBaris, nama: '', jumlah_item: '1', harga_satuan: '' },
     ]);
     setNomorBaris((value) => value + 1);
   }
@@ -278,18 +278,17 @@ export function FormProker({
           <div>
             <h2 className="text-lg font-semibold">Rincian Biaya</h2>
             <p className="text-sm text-[var(--muted)]">
-              Nominal adalah total untuk tiap item; jumlah item dicatat sebagai
-              informasi.
+              Total dihitung dari jumlah item dikalikan harga satuan.
             </p>
           </div>
           <input
             type="hidden"
             name="anggaran"
             value={JSON.stringify(
-              anggaran.map(({ nama, jumlah_item, nominal }) => ({
+              anggaran.map(({ nama, jumlah_item, harga_satuan }) => ({
                 nama,
                 jumlah_item,
-                nominal,
+                harga_satuan,
               })),
             )}
           />
@@ -324,14 +323,14 @@ export function FormProker({
                   />
                 </label>
                 <label className="grid gap-1">
-                  Nominal (Rp)
+                  Harga satuan (Rp)
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    value={item.nominal}
+                    value={item.harga_satuan}
                     onChange={(event) =>
-                      ubahAnggaran(item.id, 'nominal', event.target.value)
+                      ubahAnggaran(item.id, 'harga_satuan', event.target.value)
                     }
                     required
                   />
