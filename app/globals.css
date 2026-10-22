@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root { color-scheme: light; --page: #f8fafc; --surface: #ffffff; --text: #172033; --muted: #526075; --border: #d8dee8; }
+.dark { color-scheme: dark; --page: #101722; --surface: #182230; --text: #eff4fb; --muted: #b4c0d1; --border: #3a485c; }
+html, body { min-height: 100%; }
+body { background: var(--page); color: var(--text); }
+input, select, textarea { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: .5rem; padding: .55rem .7rem; min-height: 40px; }
+button, a { -webkit-tap-highlight-color: transparent; }
