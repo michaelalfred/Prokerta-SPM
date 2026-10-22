@@ -11,6 +11,7 @@ export async function AppHeader() {
   const links = [
     { label: 'Proker', href: '/proker', roles: ['user', 'admin', 'superadmin'] },
     { label: 'Evaluasi', href: '/evaluasi', roles: ['admin', 'superadmin'] },
+    { label: 'Analisis', href: '/analisis', roles: ['admin', 'superadmin'] },
     { label: 'Periode Input', href: '/periode', roles: ['admin', 'superadmin'] },
     { label: 'Akun', href: '/akun', roles: ['superadmin'] },
     { label: 'Visi-Misi', href: '/visi-misi', roles: ['superadmin'] },

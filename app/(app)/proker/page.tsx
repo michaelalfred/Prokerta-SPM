@@ -5,7 +5,7 @@ import { formatRupiah, hitungTotalAnggaran } from '@/lib/rules/anggaran';
 import { createClient } from '@/lib/supabase/server';
 import type { StatusProker } from '@/lib/rules/proker';
 
-type Search = { tahun?: string; lembaga?: string; bidang?: string; status?: string };
+type Search = { tahun?: string; lembaga?: string; bidang?: string; status?: string; tim?: string; misi?: string; milestone?: string };
 type TeamInfo = { id: string; nama: string; bidang_id: string; bidang: { nama: string; lembaga_id: string; lembaga: { nama: string } } };
 type ProkerRow = { id: string; tim_kerja_id: string; tahun_program: number; jenis: string; status: string; status_efektif: StatusProker; nama_kegiatan: string; tanggal_mulai: string; tanggal_selesai: string; rentang_waktu: boolean; created_at: string };
 type BudgetRow = { proker_id: string; nominal: string | number };
@@ -44,6 +44,9 @@ export default async function ProkerPage({ searchParams }: { searchParams: Promi
   let query = supabase.from('proker_v').select('id,tim_kerja_id,tahun_program,jenis,status,status_efektif,nama_kegiatan,tanggal_mulai,tanggal_selesai,rentang_waktu,created_at').order('created_at', { ascending: false });
   if (validYear) query = query.eq('tahun_program', validYear);
   if (validStatus) query = query.eq('status_efektif', validStatus);
+  if (isAdmin && filters.tim && /^[0-9a-f-]{36}$/i.test(filters.tim)) query = query.eq('tim_kerja_id', filters.tim);
+  if (isAdmin && filters.misi && /^[0-9a-f-]{36}$/i.test(filters.misi)) query = query.eq('misi_id', filters.misi);
+  if (isAdmin && filters.milestone && /^[0-9a-f-]{36}$/i.test(filters.milestone)) query = query.eq('milestone_id', filters.milestone);
   const selectedTeams = teams.filter((team) => (!filters.lembaga || team.bidang.lembaga_id === filters.lembaga) && (!filters.bidang || team.bidang_id === filters.bidang));
   if (isAdmin && (filters.lembaga || filters.bidang)) query = selectedTeams.length ? query.in('tim_kerja_id', selectedTeams.map((team) => team.id)) : query.eq('tim_kerja_id', '00000000-0000-0000-0000-000000000000');
   const { data, error } = await query;
