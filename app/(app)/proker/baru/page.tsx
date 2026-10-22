@@ -31,7 +31,7 @@ export default async function ProkerBaruPage() {
   const visi = visiResult.data?.visi ?? '';
   const visionerSiap = Boolean(visi.trim() && misi.some((item) => item.teks.trim() && item.outcome.trim() && item.milestone.some((milestone) => milestone.teks.trim())));
 
-  return <section aria-labelledby="judul-proker-baru" className="mx-auto max-w-4xl">
+  return <section aria-labelledby="judul-proker-baru" className="mx-auto w-full min-w-0 max-w-4xl">
     <h1 id="judul-proker-baru" className="mb-2 text-2xl font-semibold">Tambah Proker</h1>
     <p className="mb-6 text-sm text-[var(--muted)]">{active ? `Periode input ${active.tahun_program} sedang aktif. Jenis yang tersedia: Rutin dan Visioner.` : 'Tidak ada periode input aktif. Jenis yang tersedia: Aksidental.'}</p>
     {periodResult.error && <p role="alert" className="mb-4 text-red-700">Periode input tidak dapat dimuat. Coba muat ulang halaman.</p>}

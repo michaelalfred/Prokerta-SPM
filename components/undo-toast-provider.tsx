@@ -42,7 +42,7 @@ export function UndoToastProvider({ children }: { children: ReactNode }) {
     {children}
     <div aria-live="polite" aria-atomic="false" className="fixed bottom-3 left-3 right-3 z-[70] grid justify-items-start gap-2 sm:bottom-5 sm:left-5 sm:right-auto sm:max-w-md">
       {toasts.map((toast) => <div key={toast.id} className={`flex w-full items-center justify-between gap-4 rounded-xl px-4 py-3 text-sm text-white shadow-xl ${toast.error ? 'bg-red-800' : 'bg-slate-900'}`}>
-        <span>{toast.message}</span>{toast.undoable && <button type="button" onClick={() => undo(toast.id)} className="min-h-9 shrink-0 rounded-lg border border-white/50 px-3 font-semibold hover:bg-white/10">Urungkan</button>}
+        <span className="min-w-0 flex-1 break-words">{toast.message}</span>{toast.undoable && <button type="button" onClick={() => undo(toast.id)} className="min-h-9 shrink-0 rounded-lg border border-white/50 px-3 font-semibold hover:bg-white/10">Urungkan</button>}
       </div>)}
     </div>
   </UndoContext.Provider>;

@@ -14,5 +14,5 @@ export default async function NewEvaluationPage({ params }: { params: Promise<{ 
   if (data.tim_kerja_id !== profile.tim_kerja_id || !bolehIsiEvaluasi(data.status_efektif as StatusProker, true, false)) redirect(`/proker/${id}`);
   const { data: existing } = await supabase.from('evaluasi').select('id').eq('proker_id', id).maybeSingle();
   if (existing) redirect(`/proker/${id}`);
-  return <article className="mx-auto grid max-w-3xl gap-5"><div className="flex items-center justify-between gap-3"><h1 className="text-2xl font-semibold">Evaluasi Proker</h1><Link href={`/proker/${id}`} className="rounded-lg border border-[var(--border)] px-4 py-2">Kembali</Link></div><p>Evaluasi tidak dapat diedit setelah dikirim.</p><EvaluationForm prokerId={id} tanggalMulai={data.tanggal_mulai} tanggalSelesai={data.tanggal_selesai} rentang={data.rentang_waktu} /></article>;
+  return <article className="mx-auto grid min-w-0 max-w-3xl gap-5"><div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-semibold">Evaluasi Proker</h1><Link href={`/proker/${id}`} className="rounded-lg border border-[var(--border)] px-4 py-2">Kembali</Link></div><p>Evaluasi tidak dapat diedit setelah dikirim.</p><EvaluationForm prokerId={id} tanggalMulai={data.tanggal_mulai} tanggalSelesai={data.tanggal_selesai} rentang={data.rentang_waktu} /></article>;
 }

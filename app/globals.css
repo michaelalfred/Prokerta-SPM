@@ -3,7 +3,11 @@
 
 :root { color-scheme: light; --page: #f5f5fa; --surface: #ffffff; --text: #172033; --muted: #526075; --border: #d8dee8; }
 .dark { color-scheme: dark; --page: #101722; --surface: #182230; --text: #eff4fb; --muted: #b4c0d1; --border: #3a485c; }
-html, body { min-height: 100%; }
-body { background: var(--page); color: var(--text); }
-input, select, textarea { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: .5rem; padding: .55rem .7rem; min-height: 40px; }
+html, body { min-height: 100%; overflow-x: clip; }
+body { background: var(--page); color: var(--text); overflow-wrap: anywhere; }
+input, select, textarea { color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: .5rem; padding: .55rem .7rem; min-height: 40px; max-width: 100%; min-width: 0; }
+input:not([type='checkbox']):not([type='radio']):not([type='hidden']), select, textarea { width: 100%; }
+select { text-overflow: ellipsis; }
+input[type='file'] { width: 100%; }
 button, a { -webkit-tap-highlight-color: transparent; }
+
