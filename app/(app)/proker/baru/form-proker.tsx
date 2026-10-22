@@ -117,7 +117,7 @@ export function FormProker({ active, year, visi, misi, visionerSiap, organisasi 
             <button type="button" onClick={() => hapusAnggaran(item.id)} disabled={anggaran.length === 1} className="min-h-10 rounded-lg border border-[var(--border)] px-3 disabled:cursor-not-allowed disabled:opacity-50">Hapus</button>
           </fieldset>)}
         </div>
-        <button type="button" onClick={tambahAnggaran} className="min-h-10 justify-self-start rounded-lg border border-[var(--border)] px-4">Tambah item biaya</button>
+        <button type="button" onClick={tambahAnggaran} className="min-h-10 justify-self-start rounded-lg bg-[#2563EB] px-4 text-white dark:bg-[#3B82F6]">Tambah item biaya</button>
         <p className="text-right text-lg font-semibold">Total Anggaran: {totalTampilan}</p>
       </section>
 

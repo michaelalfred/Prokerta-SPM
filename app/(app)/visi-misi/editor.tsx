@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { hapusMilestone, hapusMisi, simpanMilestone, simpanMisi, simpanVisi } from './actions';
+import { UndoableDeleteButton } from '@/components/undoable-delete-button';
 
 type Milestone = { id: string; nomor: number; teks: string };
 type Mission = { id: string; nomor: number; teks: string; outcome: string; milestones: Milestone[] };
@@ -10,17 +11,19 @@ function FormMessage({ value }: { value: string }) { return value ? <p role="sta
 
 export function VisiMisiEditor({ visi, missions }: { visi: string; missions: Mission[] }) {
   const [message, setMessage] = useState('');
+  const [selectedMissionId, setSelectedMissionId] = useState(missions[0]?.id ?? '');
+  const selectedMission = missions.find((mission) => mission.id === selectedMissionId);
   return <div className="grid gap-6">
     <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"><h2 className="text-lg font-semibold">Visi</h2><form action={async (form) => { const result = await simpanVisi(form); setMessage(result.error || 'Visi disimpan.'); }} className="mt-3 grid gap-3"><textarea name="visi" defaultValue={visi} rows={4} required /><button className="min-h-10 rounded-lg bg-blue-700 px-4 text-white sm:justify-self-start">Simpan visi</button><FormMessage value={message} /></form></section>
-    <section><h2 className="mb-3 text-lg font-semibold">Misi dan Milestone</h2><div className="grid gap-5">{missions.map((mission) => <MissionEditor key={mission.id} mission={mission} />)}<NewMission onMessage={setMessage} /></div></section>
+    <section className="grid gap-4"><h2 className="text-lg font-semibold">Misi, Outcome, dan Milestone</h2><label className="grid max-w-xl gap-1">Pilih misi untuk diedit<select value={selectedMissionId} onChange={(event) => setSelectedMissionId(event.target.value)}><option value="">Pilih misi</option>{missions.map((mission) => <option key={mission.id} value={mission.id}>Misi {mission.nomor}</option>)}</select></label>{selectedMission ? <MissionEditor key={selectedMission.id} mission={selectedMission} onDeleted={() => setSelectedMissionId(missions.find((mission) => mission.id !== selectedMission.id)?.id ?? '')} onUndo={() => setSelectedMissionId(selectedMission.id)} /> : <p className="rounded-xl border border-[var(--border)] p-4 text-[var(--muted)]">Pilih misi untuk melihat dan mengedit teks misi, outcome, dan milestone-nya.</p>}<NewMission onMessage={setMessage} /><FormMessage value={message} /></section>
   </div>;
 }
 
-function MissionEditor({ mission }: { mission: Mission }) {
+function MissionEditor({ mission, onDeleted, onUndo }: { mission: Mission; onDeleted: () => void; onUndo: () => void }) {
   const [message, setMessage] = useState('');
   async function saveMission(form: FormData) { form.set('id', mission.id); const result = await simpanMisi(form); setMessage(result.error || 'Misi disimpan.'); }
-  async function deleteMission(form: FormData) { form.set('id', mission.id); const result = await hapusMisi(form); setMessage(result.error || 'Misi dan milestone dihapus.'); }
-  return <article className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"><form action={saveMission} className="grid gap-3 sm:grid-cols-[5rem_1fr]"><label className="grid gap-1 text-sm">Nomor<input type="number" name="nomor" min="1" defaultValue={mission.nomor} required /></label><label className="grid gap-1 text-sm sm:col-span-1">Teks misi<textarea name="teks" rows={3} defaultValue={mission.teks} required /></label><label className="grid gap-1 text-sm sm:col-span-2">Outcome<textarea name="outcome" rows={2} defaultValue={mission.outcome} required /></label><button className="min-h-10 rounded-lg bg-blue-700 px-4 text-white sm:justify-self-start">Simpan misi</button></form><form action={deleteMission} className="mt-2"><button className="min-h-10 rounded-lg px-3 text-sm text-red-700">Hapus misi</button></form><FormMessage value={message} />
+  async function deleteMission() { const form = new FormData(); form.set('id', mission.id); return hapusMisi(form); }
+  return <article className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5"><form action={saveMission} className="grid gap-3 sm:grid-cols-[5rem_1fr]"><label className="grid gap-1 text-sm">Nomor<input type="number" name="nomor" min="1" defaultValue={mission.nomor} required /></label><label className="grid gap-1 text-sm sm:col-span-1">Teks misi<textarea name="teks" rows={3} defaultValue={mission.teks} required /></label><label className="grid gap-1 text-sm sm:col-span-2">Outcome<textarea name="outcome" rows={2} defaultValue={mission.outcome} required /></label><button className="min-h-10 rounded-lg bg-blue-700 px-4 text-white sm:justify-self-start">Simpan misi</button></form><div className="mt-2"><UndoableDeleteButton label="Misi" title="Hapus misi?" message="Misi ini, outcome, dan semua milestone yang terkait akan dihapus setelah 10 detik. Aksi ini dapat dibatalkan melalui notifikasi." onDelete={deleteMission} onScheduled={onDeleted} onUndo={onUndo} className="min-h-10 rounded-lg px-3 text-sm text-red-700">Hapus misi</UndoableDeleteButton></div><FormMessage value={message} />
     <div className="mt-4 border-t border-[var(--border)] pt-4"><h3 className="font-medium">Milestone</h3><div className="mt-3 grid gap-3">{mission.milestones.map((item) => <MilestoneEditor key={item.id} item={item} missionId={mission.id} />)}<NewMilestone missionId={mission.id} /></div></div>
   </article>;
 }
@@ -28,8 +31,8 @@ function MissionEditor({ mission }: { mission: Mission }) {
 function MilestoneEditor({ item, missionId }: { item: Milestone; missionId: string }) {
   const [message, setMessage] = useState('');
   async function save(form: FormData) { form.set('id', item.id); form.set('misi_id', missionId); const result = await simpanMilestone(form); setMessage(result.error || 'Milestone disimpan.'); }
-  async function remove(form: FormData) { form.set('id', item.id); const result = await hapusMilestone(form); setMessage(result.error || 'Milestone dihapus.'); }
-  return <div className="rounded-lg border border-[var(--border)] p-3"><form action={save} className="grid gap-2 sm:grid-cols-[5rem_1fr_auto]"><label className="grid gap-1 text-sm">Nomor<input type="number" name="nomor" min="1" defaultValue={item.nomor} required /></label><label className="grid gap-1 text-sm">Teks milestone<textarea name="teks" rows={2} defaultValue={item.teks} required /></label><button className="min-h-10 self-end rounded-lg border border-[var(--border)] px-3">Simpan</button></form><form action={remove} className="mt-1"><button className="min-h-10 text-sm text-red-700">Hapus milestone</button></form><FormMessage value={message} /></div>;
+  async function remove() { const form = new FormData(); form.set('id', item.id); return hapusMilestone(form); }
+  return <div className="rounded-lg border border-[var(--border)] p-3"><form action={save} className="grid gap-2 sm:grid-cols-[5rem_1fr_auto]"><label className="grid gap-1 text-sm">Nomor<input type="number" name="nomor" min="1" defaultValue={item.nomor} required /></label><label className="grid gap-1 text-sm">Teks milestone<textarea name="teks" rows={2} defaultValue={item.teks} required /></label><button className="min-h-10 self-end rounded-lg border border-[var(--border)] px-3">Simpan</button></form><div className="mt-1"><UndoableDeleteButton label="Milestone" title="Hapus milestone?" message="Milestone ini akan dihapus setelah 10 detik. Anda dapat membatalkan penghapusan melalui notifikasi." onDelete={remove} className="min-h-10 text-sm text-red-700">Hapus milestone</UndoableDeleteButton></div><FormMessage value={message} /></div>;
 }
 
 function NewMission({ onMessage }: { onMessage: (value: string) => void }) {
