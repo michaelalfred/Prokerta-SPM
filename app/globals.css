@@ -11,3 +11,12 @@ select { text-overflow: ellipsis; }
 input[type='file'] { width: 100%; }
 button, a { -webkit-tap-highlight-color: transparent; }
 
+@keyframes navigation-progress-travel {
+  from { transform: translateX(-105%); }
+  to { transform: translateX(350%); }
+}
+.navigation-progress { position: fixed; inset: 0 0 auto; z-index: 100; height: 3px; overflow: hidden; background: color-mix(in srgb, #2563eb 18%, transparent); }
+.navigation-progress span { display: block; width: 34%; height: 100%; border-radius: 999px; background: #2563eb; animation: navigation-progress-travel 1s ease-in-out infinite; }
+.dark .navigation-progress span { background: #3b82f6; }
+@media (prefers-reduced-motion: reduce) { .navigation-progress span { animation-duration: 2.5s; } }
+
