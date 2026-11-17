@@ -1,16 +1,26 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 function NavigationFeedbackState() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const loadingStartedAt = useRef<number | null>(null);
+  const failSafeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locationKey = `${pathname}?${searchParams.toString()}`;
 
   useEffect(() => {
-    setLoading(false);
+    if (loadingStartedAt.current === null) return;
+    const remaining = Math.max(0, 350 - (Date.now() - loadingStartedAt.current));
+    const timer = setTimeout(() => {
+      loadingStartedAt.current = null;
+      if (failSafeTimer.current) clearTimeout(failSafeTimer.current);
+      failSafeTimer.current = null;
+      setLoading(false);
+    }, remaining);
+    return () => clearTimeout(timer);
   }, [locationKey]);
 
   useEffect(() => {
@@ -26,15 +36,23 @@ function NavigationFeedbackState() {
       if (destination.origin !== window.location.origin) return;
       if (`${destination.pathname}?${destination.searchParams.toString()}` === `${window.location.pathname}?${new URLSearchParams(window.location.search).toString()}`) return;
 
+      loadingStartedAt.current = Date.now();
       setLoading(true);
+      if (failSafeTimer.current) clearTimeout(failSafeTimer.current);
       if (clearTimer) clearTimeout(clearTimer);
-      clearTimer = setTimeout(() => setLoading(false), 12_000);
+      clearTimer = setTimeout(() => {
+        loadingStartedAt.current = null;
+        failSafeTimer.current = null;
+        setLoading(false);
+      }, 12_000);
+      failSafeTimer.current = clearTimer;
     };
 
     document.addEventListener('click', onClick, true);
     return () => {
       document.removeEventListener('click', onClick, true);
       if (clearTimer) clearTimeout(clearTimer);
+      failSafeTimer.current = null;
     };
   }, []);
 
