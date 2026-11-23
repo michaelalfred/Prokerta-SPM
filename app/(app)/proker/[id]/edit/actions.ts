@@ -20,7 +20,12 @@ export async function simpanEditProker(_state: HasilSimpanProker, form: FormData
   const profile = await currentProfile();
   const supabase = await createClient();
   const { data: proker } = await supabase.from('proker_v').select('id,tim_kerja_id,status_efektif').eq('id', id).maybeSingle();
-  if (!proker || !bolehEditProker(profile.role, proker.status_efektif as StatusProker, proker.tim_kerja_id === profile.tim_kerja_id)) return { error: 'Anda tidak berhak mengubah proker ini.' };
+  let ownScope = proker?.tim_kerja_id === profile.tim_kerja_id;
+  if (profile.role === 'ketua_bidang' && proker) {
+    const { data: team } = await supabase.from('tim_kerja').select('bidang_id').eq('id', proker.tim_kerja_id).maybeSingle();
+    ownScope = team?.bidang_id === profile.bidang_id;
+  }
+  if (!proker || !bolehEditProker(profile.role, proker.status_efektif as StatusProker, ownScope)) return { error: 'Anda tidak berhak mengubah proker ini.' };
 
   const fields = ['sasaran_program', 'indikator_keberhasilan', 'target', 'nama_kegiatan', 'penanggung_jawab'] as const;
   const values = Object.fromEntries(fields.map((key) => [key, ambil(form, key)])) as Record<(typeof fields)[number], string>;

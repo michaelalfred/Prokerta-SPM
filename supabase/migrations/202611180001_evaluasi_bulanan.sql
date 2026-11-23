@@ -4,6 +4,21 @@ alter table proker add column jenis_evaluasi text not null default 'tahunan'
 alter table proker add constraint proker_aksidental_evaluasi_tahunan
   check (jenis <> 'aksidental' or jenis_evaluasi = 'tahunan');
 
+-- proker_v memakai daftar kolom yang ditetapkan saat view dibuat. Refresh
+-- definisinya agar kolom baru terbaca, sambil mempertahankan urutan kolom lama.
+create or replace view proker_v with (security_invoker=true) as
+select
+  p.id,p.tim_kerja_id,p.created_by,p.tahun_program,p.jenis,p.status,
+  p.misi_id,p.milestone_id,p.visi_teks,p.misi_teks,p.outcome_teks,p.milestone_teks,
+  p.sasaran_program,p.indikator_keberhasilan,p.target,p.nama_kegiatan,
+  p.rentang_waktu,p.tanggal_mulai,p.tanggal_selesai,p.penanggung_jawab,
+  p.created_at,p.updated_at,
+  case when p.status='menunggu' and pi.tanggal_selesai<hari_ini()
+       then 'ditinjau'::status_proker else p.status end as status_efektif,
+  p.jenis_evaluasi
+from proker p
+left join periode_input pi on pi.tahun_program=p.tahun_program;
+
 alter table evaluasi drop constraint evaluasi_proker_id_key;
 alter table evaluasi add column bulan_evaluasi date;
 alter table evaluasi add constraint evaluasi_bulan_awal check (

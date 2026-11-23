@@ -14,7 +14,12 @@ export default async function EditProkerPage({ params }: { params: Promise<{ id:
   const { data } = await supabase.from('proker_v').select('*').eq('id', id).maybeSingle();
   if (!data) notFound();
   const proker = data as unknown as SavedProker;
-  if (!bolehEditProker(profile.role, proker.status_efektif, proker.tim_kerja_id === profile.tim_kerja_id)) redirect(`/proker/${id}`);
+  let ownScope = proker.tim_kerja_id === profile.tim_kerja_id;
+  if (profile.role === 'ketua_bidang') {
+    const { data: team } = await supabase.from('tim_kerja').select('bidang_id').eq('id', proker.tim_kerja_id).maybeSingle();
+    ownScope = team?.bidang_id === profile.bidang_id;
+  }
+  if (!bolehEditProker(profile.role, proker.status_efektif, ownScope)) redirect(`/proker/${id}`);
   const [budgetsResult, missionsResult, milestonesResult] = await Promise.all([
     supabase.from('proker_anggaran').select('id,nama,jumlah_item,harga_satuan').eq('proker_id', id).order('urutan'),
     supabase.from('misi').select('id,nomor,teks,outcome').order('nomor'),

@@ -20,10 +20,22 @@ export async function buatAkun(formData: FormData): Promise<{ password?: string;
   const bidangId = text(formData, 'bidang_id');
   const lembagaId = text(formData, 'lembaga_id');
   const role = text(formData, 'role');
-  if (!usernamePattern.test(username) || !namaTim || !bidangId || !lembagaId || !['admin', 'user'].includes(role)) return { error: 'Lengkapi data dengan benar.' };
+  if (!usernamePattern.test(username) || !bidangId || !lembagaId || !['admin', 'user', 'ketua_bidang'].includes(role) || (role !== 'ketua_bidang' && !namaTim)) return { error: 'Lengkapi data dengan benar.' };
   const supabase = createAdminClient();
   const { data: bidang, error: bidangError } = await supabase.from('bidang').select('id').eq('id', bidangId).eq('lembaga_id', lembagaId).maybeSingle();
   if (bidangError || !bidang) return { error: 'Bidang tidak sesuai dengan lembaga.' };
+  if (role === 'ketua_bidang') {
+    const { data: existingChair } = await supabase.from('profiles').select('id').eq('role', 'ketua_bidang').eq('bidang_id', bidangId).maybeSingle();
+    if (existingChair) return { error: 'Bidang ini sudah memiliki akun ketua.' };
+    const password = newPassword();
+    const { data: auth, error: authError } = await supabase.auth.admin.createUser({ email: `${username}@${process.env.AUTH_EMAIL_DOMAIN || 'prokerta.local'}`, password, email_confirm: true });
+    if (authError || !auth.user) return { error: authError?.message ?? 'Akun gagal dibuat.' };
+    const { error: profileError } = await supabase.from('profiles').insert({ id: auth.user.id, username, role, tim_kerja_id: null, bidang_id: bidangId, nama_koordinator: null });
+    if (profileError) { await supabase.auth.admin.deleteUser(auth.user.id); return { error: profileError.message }; }
+    revalidatePath('/akun');
+    revalidatePath('/izin-ketua');
+    return { password };
+  }
   const { data: team, error: teamError } = await supabase.from('tim_kerja').insert({ bidang_id: bidangId, nama: namaTim }).select('id').single();
   if (teamError || !team) return { error: teamError?.message ?? 'Tim kerja gagal dibuat.' };
   const password = newPassword();
@@ -53,8 +65,19 @@ export async function ubahAkun(formData: FormData): Promise<{ error?: string }> 
   const lembagaId = text(formData, 'lembaga_id');
   if (!profileId || !usernamePattern.test(username) || !namaTim || !bidangId || !lembagaId) return { error: 'Lengkapi data dengan benar.' };
   const supabase = createAdminClient();
-  const { data: profile, error: profileError } = await supabase.from('profiles').select('id,username,tim_kerja_id,role').eq('id', profileId).single();
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('id,username,tim_kerja_id,bidang_id,role').eq('id', profileId).single();
   if (profileError || !profile) return { error: 'Akun tidak ditemukan.' };
+  if (profile.role === 'ketua_bidang') {
+    if (!usernamePattern.test(username)) return { error: 'Username tidak valid.' };
+    if (profile.username !== username) {
+      const { error } = await supabase.auth.admin.updateUserById(profile.id, { email: `${username}@${process.env.AUTH_EMAIL_DOMAIN || 'prokerta.local'}`, email_confirm: true });
+      if (error) return { error: error.message };
+    }
+    const { error } = await supabase.from('profiles').update({ username }).eq('id', profile.id);
+    if (error) return { error: error.message };
+    revalidatePath('/akun');
+    return {};
+  }
   const { data: team, error: teamError } = await supabase.from('tim_kerja').select('id,bidang_id').eq('id', profile.tim_kerja_id).single();
   if (teamError || !team) return { error: 'Tim kerja tidak ditemukan.' };
   const { data: bidang, error: divisionError } = await supabase.from('bidang').select('id').eq('id', bidangId).eq('lembaga_id', lembagaId).maybeSingle();
@@ -89,7 +112,7 @@ export async function ubahRole(formData: FormData): Promise<{ error?: string }> 
   if (!profileId || profileId === actor.id || !['admin', 'user'].includes(role)) return { error: 'Perubahan role tidak diizinkan.' };
   const supabase = createAdminClient();
   const { data: target, error: readError } = await supabase.from('profiles').select('role').eq('id', profileId).single();
-  if (readError || !target || target.role === 'superadmin') return { error: 'Role akun ini tidak dapat diubah.' };
+  if (readError || !target || target.role === 'superadmin' || target.role === 'ketua_bidang') return { error: 'Role akun ini tidak dapat diubah.' };
   const { error } = await supabase.from('profiles').update({ role }).eq('id', profileId);
   if (error) return { error: error.message };
   revalidatePath('/akun');
@@ -118,17 +141,20 @@ export async function hapusAkun(formData: FormData): Promise<{ error?: string }>
   if (profileError || !profile) return { error: 'Akun tidak ditemukan.' };
   if (profile.role === 'superadmin') return { error: 'Akun superadmin tidak dapat dihapus.' };
   if (confirmation !== profile.username) return { error: 'Username konfirmasi tidak cocok.' };
-  try {
+  if (profile.role !== 'ketua_bidang' && profile.tim_kerja_id) try {
     const objects = await listObjects(profile.tim_kerja_id);
     for (let i = 0; i < objects.length; i += 100) {
       const { error } = await supabase.storage.from('bukti-evaluasi').remove(objects.slice(i, i + 100));
       if (error) return { error: `Penghapusan file gagal: ${error.message}` };
     }
   } catch (error) { return { error: `Penghapusan file gagal: ${errorMessage(error)}` }; }
-  const { error: teamError } = await supabase.from('tim_kerja').delete().eq('id', profile.tim_kerja_id);
-  if (teamError) return { error: `Penghapusan tim kerja gagal: ${teamError.message}` };
+  if (profile.tim_kerja_id) {
+    const { error: teamError } = await supabase.from('tim_kerja').delete().eq('id', profile.tim_kerja_id);
+    if (teamError) return { error: `Penghapusan tim kerja gagal: ${teamError.message}` };
+  }
   const { error: authError } = await supabase.auth.admin.deleteUser(profile.id);
-  if (authError) return { error: `Tim kerja sudah dihapus, tetapi penghapusan akun Auth gagal: ${authError.message}` };
+  if (authError) return { error: `Penghapusan akun Auth gagal: ${authError.message}` };
   revalidatePath('/akun');
+  revalidatePath('/izin-ketua');
   return {};
 }

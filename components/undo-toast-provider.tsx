@@ -13,7 +13,7 @@ export function UndoToastProvider({ children }: { children: ReactNode }) {
   const pending = useRef(new Map<number, { timer: ReturnType<typeof setTimeout>; onUndo?: () => void }>());
   const scheduleUndo = useCallback((label: string, commit: () => Promise<CommitResult>, onUndo?: () => void) => {
     const id = nextId.current++;
-    setToasts((current) => [...current, { id, message: `${label} dihapus.`, undoable: true }]);
+    setToasts((current) => [...current, { id, message: `Penghapusan ${label.toLocaleLowerCase('id-ID')} dijadwalkan.`, undoable: true }]);
     const timer = setTimeout(async () => {
       pending.current.delete(id);
       setToasts((current) => current.map((toast) => toast.id === id ? { ...toast, message: `Menghapus ${label.toLocaleLowerCase('id-ID')}…`, undoable: false } : toast));

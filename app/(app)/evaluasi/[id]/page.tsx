@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/server';
 
 function dateLabel(value:string){return new Date(`${value}T12:00:00+07:00`).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'long',year:'numeric'});}
 export default async function EvaluationDetailPage({params}:{params:Promise<{id:string}>}){
- const {id}=await params; const profile=await currentProfile(); if(profile.role==='user') redirect('/proker');
+ const {id}=await params; const profile=await currentProfile(); if(profile.role==='user' || profile.role==='ketua_bidang') redirect('/proker');
  const supabase=await createClient(); const {data:evaluation,error}=await supabase.from('evaluasi').select('*').eq('id',id).maybeSingle(); if(error||!evaluation) notFound();
  const [{data:proker},{data:budget},{data:files}]=await Promise.all([
   supabase.from('proker_v').select('*').eq('id',evaluation.proker_id).single(),

@@ -23,9 +23,10 @@ export default async function DetailProkerPage({ params, searchParams }: { param
   const { data, error } = await supabase.from('proker_v').select('*').eq('id', id).maybeSingle();
   if (error || !data) notFound();
   const proker = data as unknown as Proker;
-  const own = proker.tim_kerja_id === profile.tim_kerja_id;
-  const teamResult = await supabase.from('tim_kerja').select('id,nama,bidang(nama,lembaga(nama))').eq('id', proker.tim_kerja_id).single();
-  const team = teamResult.data as unknown as { nama: string; bidang: { nama: string; lembaga: { nama: string } } } | null;
+  const teamResult = await supabase.from('tim_kerja').select('id,nama,bidang_id,bidang(nama,lembaga(nama))').eq('id', proker.tim_kerja_id).single();
+  const team = teamResult.data as unknown as { nama: string; bidang_id: string; bidang: { nama: string; lembaga: { nama: string } } } | null;
+  const ownTeam = proker.tim_kerja_id === profile.tim_kerja_id;
+  const own = profile.role === 'ketua_bidang' ? team?.bidang_id === profile.bidang_id : ownTeam;
   const [budgetResult, evaluationResult] = await Promise.all([
     supabase.from('proker_anggaran').select('id,urutan,nama,jumlah_item,harga_satuan').eq('proker_id', id).order('urutan'),
     supabase.from('evaluasi').select('*').eq('proker_id', id).order('bulan_evaluasi', { ascending: true, nullsFirst: false }),
@@ -33,11 +34,11 @@ export default async function DetailProkerPage({ params, searchParams }: { param
   const budgets = (budgetResult.data ?? []) as Budget[];
   const total = hitungTotalAnggaran(budgets.length ? budgets : [{ harga_satuan: '0', jumlah_item: 1 }]);
   const allowedEdit = bolehEditProker(profile.role, proker.status_efektif, own);
-  const allowedDelete = bolehHapusProker(profile.role, proker.status_efektif, own);
+  const allowedDelete = bolehHapusProker(profile.role, proker.status_efektif, ownTeam);
   const allowedStatus = bolehUbahStatus(profile.role, proker.status_efektif);
   const evaluations = evaluationResult.data ?? [];
   const filledMonths = new Set(evaluations.map((item) => item.bulan_evaluasi).filter(Boolean));
-  const allowedEvaluation = own && proker.status_efektif === 'disetujui' && (proker.jenis_evaluasi === 'bulanan' ? filledMonths.size < 12 : !evaluations.some((item) => item.bulan_evaluasi === null));
+  const allowedEvaluation = ownTeam && proker.status_efektif === 'disetujui' && (proker.jenis_evaluasi === 'bulanan' ? filledMonths.size < 12 : !evaluations.some((item) => item.bulan_evaluasi === null));
   const evaluationIds = evaluations.map((item) => item.id);
   const [realizationResult, filesResult] = evaluationIds.length ? await Promise.all([
     supabase.from('evaluasi_anggaran').select('id,evaluasi_id,urutan,nama,jumlah_item,harga_satuan').in('evaluasi_id', evaluationIds).order('urutan'),
@@ -80,7 +81,7 @@ export default async function DetailProkerPage({ params, searchParams }: { param
       {allowedDelete && <DeleteProkerForm id={id} />}
       {allowedStatus && <StatusProkerForm id={id} currentStatus={proker.status_efektif} />}
       {allowedEvaluation && <Link href={`/proker/${id}/evaluasi/baru`} className="inline-flex min-h-10 items-center rounded-lg bg-green-700 px-4 text-white">Isi Evaluasi</Link>}
-      {profile.role !== 'user' && proker.status_efektif === 'direvisi' && <StatusProkerForm id={id} currentStatus={proker.status_efektif} completeRevision />}
+      {(profile.role === 'admin' || profile.role === 'superadmin') && proker.status_efektif === 'direvisi' && <StatusProkerForm id={id} currentStatus={proker.status_efektif} completeRevision />}
     </section>
     {evaluations.length > 0 && <section className="grid min-w-0 max-w-full gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6"><h2 className="text-lg font-semibold">Evaluasi (read-only)</h2>{evaluations.map((evaluation) => {
       const realization = realizations.filter((item) => item.evaluasi_id === evaluation.id);

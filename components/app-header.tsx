@@ -4,16 +4,17 @@ import { currentProfile } from '@/lib/auth';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { logout } from '@/app/logout/actions';
 
-const roleName = { user: 'Pengguna', admin: 'Admin', superadmin: 'Superadmin' };
+const roleName = { user: 'Pengguna', admin: 'Admin', superadmin: 'Superadmin', ketua_bidang: 'Ketua Bidang' };
 
 export async function AppHeader() {
   const profile = await currentProfile();
   const links = [
-    { label: 'Proker', href: '/proker', roles: ['user', 'admin', 'superadmin'] },
+    { label: 'Proker', href: '/proker', roles: ['user', 'admin', 'superadmin', 'ketua_bidang'] },
     { label: 'Evaluasi', href: '/evaluasi', roles: ['admin', 'superadmin'] },
     { label: 'Analisis', href: '/analisis', roles: ['admin', 'superadmin'] },
     { label: 'Periode Input', href: '/periode', roles: ['admin', 'superadmin'] },
     { label: 'Akun', href: '/akun', roles: ['superadmin'] },
+    { label: 'Izin Ketua Bidang', href: '/izin-ketua', roles: ['admin', 'superadmin'] },
     { label: 'Visi-Misi', href: '/visi-misi', roles: ['superadmin'] },
   ].filter((item) => item.roles.includes(profile.role));
   return <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)]">
@@ -28,7 +29,7 @@ export async function AppHeader() {
         <details className="relative">
           <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-[var(--border)] px-3 text-sm">Akun</summary>
           <div className="absolute right-0 top-12 z-30 w-64 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg">
-            <p className="font-medium">{profile.tim_kerja.nama}</p><p className="text-sm text-[var(--muted)]">{profile.username} · {roleName[profile.role]}</p>
+            <p className="font-medium">{profile.tim_kerja?.nama ?? profile.bidang?.nama ?? 'Akun'}</p><p className="text-sm text-[var(--muted)]">{profile.username} · {roleName[profile.role]}</p>
             <div className="mt-3 grid gap-1 border-t border-[var(--border)] pt-2"><Link className="rounded px-2 py-2 hover:bg-slate-100 dark:hover:bg-slate-700" href="/ganti-password">Ganti Password</Link><form action={logout}><button className="min-h-10 w-full rounded px-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700">Keluar</button></form></div>
           </div>
         </details>

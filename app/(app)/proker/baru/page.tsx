@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { currentProfile } from '@/lib/auth';
 import { periodeAktif, type InputPeriod } from '@/lib/rules/periode';
 import { createClient } from '@/lib/supabase/server';
@@ -5,6 +6,7 @@ import { FormProker, type MisiForm } from './form-proker';
 
 export default async function ProkerBaruPage() {
   const profile = await currentProfile();
+  if (profile.role === 'ketua_bidang' || !profile.tim_kerja) redirect('/proker');
   const supabase = await createClient();
   const [periodResult, visiResult, misiResult, milestoneResult] = await Promise.all([
     supabase.from('periode_input').select('tahun_program,tanggal_mulai,tanggal_selesai'),

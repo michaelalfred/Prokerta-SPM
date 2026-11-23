@@ -30,13 +30,17 @@ export default async function ProkerPage({ searchParams }: { searchParams: Promi
   const profile = await currentProfile();
   const filters = await searchParams;
   const isAdmin = profile.role === 'admin' || profile.role === 'superadmin';
+  const isChair = profile.role === 'ketua_bidang';
   const supabase = await createClient();
 
-  const [teamsResult, yearsResult] = isAdmin ? await Promise.all([
+  const [teamsResult, yearsResult, grantsResult] = isAdmin || isChair ? await Promise.all([
     supabase.from('tim_kerja').select('id,nama,bidang_id,bidang(nama,lembaga_id,lembaga(nama))').order('nama'),
     supabase.from('proker_v').select('tahun_program'),
-  ]) : [null, null];
+    isChair ? supabase.from('ketua_bidang_izin').select('bidang_id').eq('profile_id', profile.id) : Promise.resolve({ data: [] }),
+  ]) : [null, null, null];
   const teams = (teamsResult?.data ?? []) as unknown as TeamInfo[];
+  const allowedDivisionIds = new Set([profile.bidang_id, ...(grantsResult?.data ?? []).map((item) => item.bidang_id)]);
+  const visibleTeams = isChair ? teams.filter((team) => allowedDivisionIds.has(team.bidang_id)) : teams;
   const teamById = new Map(teams.map((team) => [team.id, team]));
   const years = [...new Set((yearsResult?.data ?? []).map((row) => row.tahun_program))].sort((a, b) => b - a);
   const validYear = filters.tahun && /^\d{4}$/.test(filters.tahun) ? Number(filters.tahun) : null;
@@ -44,11 +48,11 @@ export default async function ProkerPage({ searchParams }: { searchParams: Promi
   let query = supabase.from('proker_v').select('id,tim_kerja_id,tahun_program,jenis,status,status_efektif,nama_kegiatan,tanggal_mulai,tanggal_selesai,rentang_waktu,created_at').order('created_at', { ascending: false });
   if (validYear) query = query.eq('tahun_program', validYear);
   if (validStatus) query = query.eq('status_efektif', validStatus);
-  if (isAdmin && filters.tim && /^[0-9a-f-]{36}$/i.test(filters.tim)) query = query.eq('tim_kerja_id', filters.tim);
+  if ((isAdmin || isChair) && filters.tim && /^[0-9a-f-]{36}$/i.test(filters.tim)) query = query.eq('tim_kerja_id', filters.tim);
   if (isAdmin && filters.misi && /^[0-9a-f-]{36}$/i.test(filters.misi)) query = query.eq('misi_id', filters.misi);
   if (isAdmin && filters.milestone && /^[0-9a-f-]{36}$/i.test(filters.milestone)) query = query.eq('milestone_id', filters.milestone);
-  const selectedTeams = teams.filter((team) => (!filters.lembaga || team.bidang.lembaga_id === filters.lembaga) && (!filters.bidang || team.bidang_id === filters.bidang));
-  if (isAdmin && (filters.lembaga || filters.bidang)) query = selectedTeams.length ? query.in('tim_kerja_id', selectedTeams.map((team) => team.id)) : query.eq('tim_kerja_id', '00000000-0000-0000-0000-000000000000');
+  const selectedTeams = visibleTeams.filter((team) => (!filters.lembaga || team.bidang.lembaga_id === filters.lembaga) && (!filters.bidang || team.bidang_id === filters.bidang));
+  if ((isAdmin || isChair) && (filters.lembaga || filters.bidang)) query = selectedTeams.length ? query.in('tim_kerja_id', selectedTeams.map((team) => team.id)) : query.eq('tim_kerja_id', '00000000-0000-0000-0000-000000000000');
   const { data, error } = await query;
   const rows = (data ?? []) as ProkerRow[];
   const ids = rows.map((row) => row.id);
@@ -62,22 +66,22 @@ export default async function ProkerPage({ searchParams }: { searchParams: Promi
   for (const [prokerId, items] of budgetsByProker) totalByProker.set(prokerId, hitungTotalAnggaran(items));
   const teamName = (id: string) => {
     const team = teamById.get(id);
-    return isAdmin && team ? `${team.bidang.lembaga.nama} · ${team.bidang.nama} · ${team.nama}` : profile.tim_kerja.nama;
+    return team ? `${team.bidang.lembaga.nama} · ${team.bidang.nama} · ${team.nama}` : profile.tim_kerja?.nama ?? '';
   };
   const dateLabel = (row: ProkerRow) => row.rentang_waktu ? `${tanggal(row.tanggal_mulai)} – ${tanggal(row.tanggal_selesai)}` : tanggal(row.tanggal_mulai);
 
   return <section className="grid min-w-0 max-w-full gap-5" aria-labelledby="judul-proker">
-    <div className="flex flex-wrap items-center justify-between gap-4"><h1 id="judul-proker" className="text-2xl font-semibold">Proker</h1><Link href="/proker/baru" className="inline-flex min-h-10 items-center rounded-lg bg-blue-700 px-4 font-medium text-white">Tambah Proker</Link></div>
-    {isAdmin && <form className="grid min-w-0 max-w-full gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Filter proker">
+    <div className="flex flex-wrap items-center justify-between gap-4"><h1 id="judul-proker" className="text-2xl font-semibold">Proker</h1>{!isChair && <Link href="/proker/baru" className="inline-flex min-h-10 items-center rounded-lg bg-blue-700 px-4 font-medium text-white">Tambah Proker</Link>}</div>
+    {(isAdmin || isChair) && <form className="grid min-w-0 max-w-full gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Filter proker">
       <label className="grid min-w-0 gap-1 text-sm font-medium">Tahun Program<select name="tahun" defaultValue={filters.tahun ?? ''} className="w-full min-w-0 max-w-full truncate"><option value="">Semua tahun</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
-      <label className="grid min-w-0 gap-1 text-sm font-medium">Lembaga<select name="lembaga" defaultValue={filters.lembaga ?? ''} className="w-full min-w-0 max-w-full truncate"><option value="">Semua lembaga</option>{[...new Map(teams.map((team) => [team.bidang.lembaga_id, team.bidang.lembaga.nama])).entries()].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
-      <label className="grid min-w-0 gap-1 text-sm font-medium">Bidang<select name="bidang" defaultValue={filters.bidang ?? ''} className="w-full min-w-0 max-w-full truncate"><option value="">Semua bidang</option>{[...new Map(teams.map((team) => [team.bidang_id, `${team.bidang.lembaga.nama} · ${team.bidang.nama}`])).entries()].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
+      <label className="grid min-w-0 gap-1 text-sm font-medium">Lembaga<select name="lembaga" defaultValue={filters.lembaga ?? ''} className="w-full min-w-0 max-w-full truncate"><option value="">Semua lembaga</option>{[...new Map(visibleTeams.map((team) => [team.bidang.lembaga_id, team.bidang.lembaga.nama])).entries()].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
+      <label className="grid min-w-0 gap-1 text-sm font-medium">Bidang<select name="bidang" defaultValue={filters.bidang ?? ''} className="w-full min-w-0 max-w-full truncate"><option value="">Semua bidang</option>{[...new Map(visibleTeams.map((team) => [team.bidang_id, `${team.bidang.lembaga.nama} · ${team.bidang.nama}`])).entries()].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label>
       <label className="grid min-w-0 gap-1 text-sm font-medium">Status<select name="status" defaultValue={filters.status ?? ''} className="w-full min-w-0 max-w-full truncate"><option value="">Semua status</option>{statuses.map((status) => <option key={status} value={status}>{status[0].toLocaleUpperCase('id-ID') + status.slice(1)}</option>)}</select></label>
       <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-4"><button className="min-h-10 rounded-lg bg-blue-700 px-4 text-white">Terapkan filter</button><Link href="/proker" className="inline-flex min-h-10 items-center rounded-lg border border-[var(--border)] px-4">Bersihkan</Link></div>
     </form>}
     {error || budgetResult.error ? <p role="alert" className="rounded-lg border border-red-300 p-4 text-red-700">Daftar proker tidak dapat dimuat. Muat ulang halaman.</p> : rows.length === 0 ? <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--muted)]">Belum ada proker</div> : <>
-      <div className="grid min-w-0 max-w-full gap-3 md:hidden">{rows.map((row) => <article key={row.id} className="grid min-w-0 gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="flex min-w-0 flex-wrap items-start justify-between gap-2"><strong className="min-w-0 break-words">{row.nama_kegiatan}</strong><Badge status={row.status_efektif} /></div>{isAdmin && <p className="text-sm text-[var(--muted)] break-words">{teamName(row.tim_kerja_id)}</p>}<p className="text-sm break-words">{row.tahun_program} · {row.jenis[0].toLocaleUpperCase('id-ID') + row.jenis.slice(1)}</p><p className="text-sm break-words">{dateLabel(row)}</p><p className="text-sm break-words">Total anggaran: {formatRupiah(totalByProker.get(row.id) ?? '0.00')}</p><Link className="inline-flex min-h-10 items-center font-medium text-blue-700 dark:text-blue-300" href={`/proker/${row.id}`}>Lihat detail</Link></article>)}</div>
-      <div className="hidden min-w-0 max-w-full overflow-x-auto rounded-xl border border-[var(--border)] md:block"><table className="w-full min-w-[760px] border-collapse text-left"><thead className="bg-[var(--surface)]"><tr>{['Tahun Program','Jenis','Nama Kegiatan',...(isAdmin ? ['Tim Kerja'] : []),'Tanggal','Total Anggaran','Status',''].map((heading, index) => <th key={`${heading}-${index}`} className="border-b border-[var(--border)] px-3 py-3 text-sm font-semibold">{heading}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="bg-[var(--page)]"><td className="border-b border-[var(--border)] px-3 py-3">{row.tahun_program}</td><td className="border-b border-[var(--border)] px-3 py-3">{row.jenis[0].toLocaleUpperCase('id-ID') + row.jenis.slice(1)}</td><td className="border-b border-[var(--border)] px-3 py-3">{row.nama_kegiatan}</td>{isAdmin && <td className="border-b border-[var(--border)] px-3 py-3">{teamName(row.tim_kerja_id)}</td>}<td className="border-b border-[var(--border)] px-3 py-3">{dateLabel(row)}</td><td className="border-b border-[var(--border)] px-3 py-3">{formatRupiah(totalByProker.get(row.id) ?? '0.00')}</td><td className="border-b border-[var(--border)] px-3 py-3"><Badge status={row.status_efektif} /></td><td className="border-b border-[var(--border)] px-3 py-3"><Link href={`/proker/${row.id}`} className="font-medium text-blue-700 dark:text-blue-300">Detail</Link></td></tr>)}</tbody></table></div>
+      <div className="grid min-w-0 max-w-full gap-3 md:hidden">{rows.map((row) => <article key={row.id} className="grid min-w-0 gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="flex min-w-0 flex-wrap items-start justify-between gap-2"><strong className="min-w-0 break-words">{row.nama_kegiatan}</strong><Badge status={row.status_efektif} /></div>{(isAdmin || isChair) && <p className="text-sm text-[var(--muted)] break-words">{teamName(row.tim_kerja_id)}</p>}<p className="text-sm break-words">{row.tahun_program} · {row.jenis[0].toLocaleUpperCase('id-ID') + row.jenis.slice(1)}</p><p className="text-sm break-words">{dateLabel(row)}</p><p className="text-sm break-words">Total anggaran: {formatRupiah(totalByProker.get(row.id) ?? '0.00')}</p><Link className="inline-flex min-h-10 items-center font-medium text-blue-700 dark:text-blue-300" href={`/proker/${row.id}`}>Lihat detail</Link></article>)}</div>
+      <div className="hidden min-w-0 max-w-full overflow-x-auto rounded-xl border border-[var(--border)] md:block"><table className="w-full min-w-[760px] border-collapse text-left"><thead className="bg-[var(--surface)]"><tr>{['Tahun Program','Jenis','Nama Kegiatan',...((isAdmin || isChair) ? ['Tim Kerja'] : []),'Tanggal','Total Anggaran','Status',''].map((heading, index) => <th key={`${heading}-${index}`} className="border-b border-[var(--border)] px-3 py-3 text-sm font-semibold">{heading}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="bg-[var(--page)]"><td className="border-b border-[var(--border)] px-3 py-3">{row.tahun_program}</td><td className="border-b border-[var(--border)] px-3 py-3">{row.jenis[0].toLocaleUpperCase('id-ID') + row.jenis.slice(1)}</td><td className="border-b border-[var(--border)] px-3 py-3">{row.nama_kegiatan}</td>{(isAdmin || isChair) && <td className="border-b border-[var(--border)] px-3 py-3">{teamName(row.tim_kerja_id)}</td>}<td className="border-b border-[var(--border)] px-3 py-3">{dateLabel(row)}</td><td className="border-b border-[var(--border)] px-3 py-3">{formatRupiah(totalByProker.get(row.id) ?? '0.00')}</td><td className="border-b border-[var(--border)] px-3 py-3"><Badge status={row.status_efektif} /></td><td className="border-b border-[var(--border)] px-3 py-3"><Link href={`/proker/${row.id}`} className="font-medium text-blue-700 dark:text-blue-300">Detail</Link></td></tr>)}</tbody></table></div>
     </>}
   </section>;
 }

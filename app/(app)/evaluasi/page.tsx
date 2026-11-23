@@ -11,7 +11,7 @@ const statuses = ['menunggu','ditinjau','disetujui','ditolak','direvisi'];
 
 export default async function EvaluationsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const profile = await currentProfile();
-  if (profile.role === 'user') redirect('/proker');
+  if (profile.role === 'user' || profile.role === 'ketua_bidang') redirect('/proker');
   const filters = await searchParams;
   const supabase = await createClient();
   const [teamResult, evaluationResult, yearResult] = await Promise.all([
