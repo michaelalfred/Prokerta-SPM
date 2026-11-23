@@ -18,4 +18,6 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] };
+// Public static assets (logo, icons, and any future files with extensions) do
+// not require an Auth session; redirecting them to /login makes images fail.
+export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'] };
