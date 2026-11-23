@@ -13,17 +13,23 @@ type MetaFile = { nama_file: string; mime_type: string; ukuran_bytes: number };
 const allowedMime = ['image/jpeg', 'image/png', 'application/pdf'];
 const extByMime: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'application/pdf': 'pdf' };
 
-async function bolehIsi(prokerId: string) {
+async function bolehIsi(prokerId: string, bulanEvaluasi: string | null = null) {
   const profile = await currentProfile();
   const supabase = await createClient();
-  const { data: proker } = await supabase.from('proker_v').select('id,tim_kerja_id,status_efektif').eq('id', prokerId).maybeSingle();
+  const { data: proker } = await supabase.from('proker_v').select('id,tim_kerja_id,tahun_program,jenis_evaluasi,status_efektif').eq('id', prokerId).maybeSingle();
   if (!proker || proker.tim_kerja_id !== profile.tim_kerja_id || !bolehIsiEvaluasi(proker.status_efektif as StatusProker, true, false)) return null;
-  const { data: existing } = await supabase.from('evaluasi').select('id').eq('proker_id', prokerId).maybeSingle();
-  return existing ? null : { profile, supabase };
+  if (proker.jenis_evaluasi === 'tahunan') {
+    if (bulanEvaluasi !== null) return null;
+    const { data: existing } = await supabase.from('evaluasi').select('id').eq('proker_id', prokerId).is('bulan_evaluasi', null).maybeSingle();
+    return existing ? null : { profile, supabase, proker };
+  }
+  if (!bulanEvaluasi || !/^\d{4}-(0[1-9]|1[0-2])-01$/.test(bulanEvaluasi) || Number(bulanEvaluasi.slice(0, 4)) !== proker.tahun_program) return null;
+  const { data: existing } = await supabase.from('evaluasi').select('id').eq('proker_id', prokerId).eq('bulan_evaluasi', bulanEvaluasi).maybeSingle();
+  return existing ? null : { profile, supabase, proker };
 }
 
-export async function siapkanUpload(prokerId: string, files: MetaFile[]) {
-  const context = await bolehIsi(prokerId);
+export async function siapkanUpload(prokerId: string, bulanEvaluasi: string | null, files: MetaFile[]) {
+  const context = await bolehIsi(prokerId, bulanEvaluasi);
   if (!context) return { error: 'Proker tidak dapat dievaluasi. Muat ulang halaman.' };
   if (!Array.isArray(files) || files.length > 10 || files.some((file) => !file || !allowedMime.includes(file.mime_type) || !Number.isInteger(file.ukuran_bytes) || file.ukuran_bytes < 1 || file.ukuran_bytes > 10485760)) {
     return { error: 'Pilih maksimal 10 file JPG, PNG, atau PDF. Ukuran setiap file maksimal 10 MB.' };
@@ -44,7 +50,8 @@ export async function siapkanUpload(prokerId: string, files: MetaFile[]) {
 }
 
 export async function simpanEvaluasi(prokerId: string, form: FormData) {
-  const context = await bolehIsi(prokerId);
+  const bulanEvaluasi = String(form.get('bulan_evaluasi') ?? '') || null;
+  const context = await bolehIsi(prokerId, bulanEvaluasi);
   if (!context) redirect(`/proker/${prokerId}?galat=evaluasi`);
   const hasil = String(form.get('hasil_kegiatan') ?? '').trim();
   const capaianText = String(form.get('capaian_persen') ?? '');
@@ -71,6 +78,7 @@ export async function simpanEvaluasi(prokerId: string, form: FormData) {
     p_keterangan_tambahan: tambahan || null,
     p_anggaran: budgetItems.map((item) => ({ ...item, jumlah_item: String(item.jumlah_item) })),
     p_files: files,
+    p_bulan_evaluasi: bulanEvaluasi,
   });
   if (error) {
     if (paths.length) await admin.storage.from('bukti-evaluasi').remove(paths);

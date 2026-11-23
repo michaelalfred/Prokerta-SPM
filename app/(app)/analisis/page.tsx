@@ -2,8 +2,9 @@ import { Suspense } from 'react';
 import { requireRole } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { AchievementSection, BudgetSection, ComplianceSection, MissionSection, StatusSection } from './sections';
+import { MonthlyEvaluationAnalysis } from './monthly-evaluation-analysis';
 
-type Search = { tahun?: string; lembaga?: string };
+type Search = { tahun?: string; lembaga?: string; bulan?: string };
 type Period = { tahun_program: number; tanggal_mulai: string; tanggal_selesai: string };
 export default async function AnalisisPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requireRole(['admin','superadmin']);
@@ -21,16 +22,20 @@ export default async function AnalisisPage({ searchParams }: { searchParams: Pro
   const institutionId=(institutions??[]).some(l=>l.id===params.lembaga)?params.lembaga!:null;
   const hasYear=year!==null;
   const hasProker=hasYear&&(prokerYears??[]).some(p=>p.tahun_program===year);
+  const month=/^\d{4}-(0[1-9]|1[0-2])$/.test(params.bulan??'')&&Number(params.bulan!.slice(0,4))===year?params.bulan!:'';
+  const bulanEvaluasi=month?`${month}-01`:null;
   return <section className="grid min-w-0 gap-5" aria-labelledby="analisis-title">
     <div><h1 id="analisis-title" className="text-2xl font-semibold">Analisis</h1><p className="mt-1 text-sm text-[var(--muted)]">Ringkasan proker dan evaluasi menurut tahun program.</p></div>
     <form className="grid gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:grid-cols-2 sm:items-end" aria-label="Filter analisis">
       <label className="grid gap-1 text-sm">Tahun Program<select name="tahun" required defaultValue={year??''}><option value="" disabled>Pilih tahun</option>{years.map(y=><option key={y} value={y}>{y}</option>)}</select></label>
       <label className="grid gap-1 text-sm">Lembaga<select name="lembaga" defaultValue={institutionId??''}><option value="">Semua lembaga</option>{(institutions??[]).map(l=><option key={l.id} value={l.id}>{l.nama}</option>)}</select></label>
+      <label className="grid gap-1 text-sm">Bulan Evaluasi Bulanan<select name="bulan" defaultValue={month}><option value="">Pilih bulan</option>{Array.from({length:12},(_,i)=>`${year}-${String(i+1).padStart(2,'0')}`).map(m=><option key={m} value={m}>{new Date(`${m}-01T12:00:00+07:00`).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta',month:'long',year:'numeric'})}</option>)}</select></label>
       <button className="min-h-10 rounded-lg bg-blue-700 px-4 text-white sm:col-span-2 sm:justify-self-start">Terapkan filter</button>
     </form>
     {!hasProker ? <p className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">Belum ada data untuk tahun program ini.</p> : <>
       <Suspense fallback={<Loading title="Ringkasan Status"/>}><StatusSection year={year} institutionId={institutionId}/></Suspense>
       <Suspense fallback={<Loading title="Kepatuhan Evaluasi"/>}><ComplianceSection year={year} institutionId={institutionId}/></Suspense>
+      {bulanEvaluasi ? <Suspense fallback={<Loading title="Analisis Evaluasi Bulanan"/>}><MonthlyEvaluationAnalysis year={year} month={bulanEvaluasi} institutionId={institutionId}/></Suspense> : <section className="grid gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6"><h2 className="text-lg font-semibold">Analisis Evaluasi Bulanan</h2><p className="text-sm text-[var(--muted)]">Pilih bulan untuk melihat kepatuhan, capaian, dan realisasi evaluasi bulanan.</p></section>}
       <Suspense fallback={<Loading title="Rencana vs Realisasi Anggaran"/>}><BudgetSection year={year} institutionId={institutionId}/></Suspense>
       <Suspense fallback={<Loading title="Capaian per Bidang"/>}><AchievementSection year={year} institutionId={institutionId}/></Suspense>
       <Suspense fallback={<Loading title="Peta Misi-Milestone"/>}><MissionSection year={year} institutionId={institutionId}/></Suspense>

@@ -20,6 +20,7 @@ export async function simpanProker(_state: HasilSimpanProker, form: FormData): P
   await currentProfile();
   const supabase = await createClient();
   const jenis = ambil(form, 'jenis') as JenisProker;
+  const jenisEvaluasi = jenis === 'aksidental' ? 'tahunan' : ambil(form, 'jenis_evaluasi');
   const sasaran_program = ambil(form, 'sasaran_program');
   const indikator_keberhasilan = ambil(form, 'indikator_keberhasilan');
   const target = ambil(form, 'target');
@@ -45,6 +46,9 @@ export async function simpanProker(_state: HasilSimpanProker, form: FormData): P
   const tersedia = jenisProkerTersedia((periods ?? []) as InputPeriod[], new Date());
   if (!['rutin', 'visioner', 'aksidental'].includes(jenis) || !tersedia.some((item) => item.jenis === jenis)) {
     return { error: 'Jenis proker tidak tersedia untuk tanggal hari ini. Muat ulang halaman dan coba lagi.' };
+  }
+  if (!['tahunan', 'bulanan'].includes(jenisEvaluasi) || (jenis === 'aksidental' && jenisEvaluasi !== 'tahunan')) {
+    return { error: 'Pilih jenis evaluasi yang sesuai dengan jenis proker.' };
   }
 
   let dataAnggaran: unknown;
@@ -77,6 +81,7 @@ export async function simpanProker(_state: HasilSimpanProker, form: FormData): P
     p_anggaran: anggaran.map((item) => ({ ...item, jumlah_item: String(item.jumlah_item) })),
     p_misi_id: misi_id,
     p_milestone_id: milestone_id,
+    p_jenis_evaluasi: jenisEvaluasi,
   });
   if (error) {
     const pesanDikenal = [

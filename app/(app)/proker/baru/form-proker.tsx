@@ -45,6 +45,7 @@ export function FormProker({
   const [jenis, setJenis] = useState<JenisProker>(
     active ? 'rutin' : 'aksidental',
   );
+  const [jenisEvaluasi, setJenisEvaluasi] = useState<'tahunan' | 'bulanan'>('tahunan');
   const [rentangWaktu, setRentangWaktu] = useState(false);
   const [tanggalMulai, setTanggalMulai] = useState('');
   const [tanggalSelesai, setTanggalSelesai] = useState('');
@@ -123,7 +124,11 @@ export function FormProker({
             <select
               name="jenis"
               value={jenis}
-              onChange={(event) => setJenis(event.target.value as JenisProker)}
+              onChange={(event) => {
+                const value = event.target.value as JenisProker;
+                setJenis(value);
+                if (value === 'aksidental') setJenisEvaluasi('tahunan');
+              }}
               required
             >
               {active ? (
@@ -139,6 +144,15 @@ export function FormProker({
               )}
             </select>
           </label>
+          {active && jenis !== 'aksidental' && (
+            <label className="grid gap-1 font-medium">
+              Jenis Evaluasi
+              <select name="jenis_evaluasi" value={jenisEvaluasi} onChange={(event) => setJenisEvaluasi(event.target.value as 'tahunan' | 'bulanan')} required>
+                <option value="tahunan">Tahunan</option>
+                <option value="bulanan">Bulanan</option>
+              </select>
+            </label>
+          )}
           <p className="text-sm text-[var(--muted)]">
             {active
               ? `Tahun program: ${year}.`
