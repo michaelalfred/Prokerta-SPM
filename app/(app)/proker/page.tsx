@@ -9,10 +9,36 @@ type Search = { tahun?: string; lembaga?: string; bidang?: string; status?: stri
 type TeamInfo = { id: string; nama: string; bidang_id: string; bidang: { nama: string; lembaga_id: string; lembaga: { nama: string } } };
 type ProkerRow = { id: string; tim_kerja_id: string; tahun_program: number; jenis: string; status: string; status_efektif: StatusProker; nama_kegiatan: string; tanggal_mulai: string; tanggal_selesai: string; rentang_waktu: boolean; created_at: string };
 type BudgetRow = { proker_id: string; jumlah_item: number; harga_satuan: string | number };
+type DateCollision = { mulai: string; selesai: string; rows: ProkerRow[] };
 const statuses: StatusProker[] = ['menunggu', 'ditinjau', 'disetujui', 'ditolak', 'direvisi'];
 
 function tanggal(value: string): string {
   return new Date(`${value}T12:00:00+07:00`).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function cariBenturanTanggal(rows: ProkerRow[]): { collisions: DateCollision[]; affectedCount: number } {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const bounds = [...new Set(rows.flatMap((row) => [Date.parse(`${row.tanggal_mulai}T00:00:00Z`), Date.parse(`${row.tanggal_selesai}T00:00:00Z`) + dayMs]))].sort((a, b) => a - b);
+  const collisions: DateCollision[] = [];
+  const affected = new Set<string>();
+
+  for (let index = 0; index < bounds.length - 1; index += 1) {
+    const start = bounds[index];
+    const end = bounds[index + 1] - dayMs;
+    if (start > end) continue;
+    const occurring = rows.filter((row) => Date.parse(`${row.tanggal_mulai}T00:00:00Z`) <= start && Date.parse(`${row.tanggal_selesai}T00:00:00Z`) >= start);
+    if (occurring.length < 2) continue;
+    occurring.forEach((row) => affected.add(row.id));
+
+    const previous = collisions.at(-1);
+    const sameProkers = previous && previous.rows.map((row) => row.id).sort().join(',') === occurring.map((row) => row.id).sort().join(',');
+    if (sameProkers && Date.parse(`${previous.selesai}T00:00:00Z`) + dayMs === start) {
+      previous.selesai = new Date(end).toISOString().slice(0, 10);
+    } else {
+      collisions.push({ mulai: new Date(start).toISOString().slice(0, 10), selesai: new Date(end).toISOString().slice(0, 10), rows: occurring });
+    }
+  }
+  return { collisions, affectedCount: affected.size };
 }
 
 function Badge({ status }: { status: StatusProker }) {
@@ -55,6 +81,7 @@ export default async function ProkerPage({ searchParams }: { searchParams: Promi
   if ((isAdmin || isChair) && (filters.lembaga || filters.bidang)) query = selectedTeams.length ? query.in('tim_kerja_id', selectedTeams.map((team) => team.id)) : query.eq('tim_kerja_id', '00000000-0000-0000-0000-000000000000');
   const { data, error } = await query;
   const rows = (data ?? []) as ProkerRow[];
+  const dateCollisions = cariBenturanTanggal(rows);
   const ids = rows.map((row) => row.id);
   const budgetResult = ids.length ? await supabase.from('proker_anggaran').select('proker_id,jumlah_item,harga_satuan').in('proker_id', ids) : { data: [], error: null };
   const totalByProker = new Map<string, string>();
@@ -79,6 +106,17 @@ export default async function ProkerPage({ searchParams }: { searchParams: Promi
       <label className="grid min-w-0 gap-1 text-sm font-medium">Status<select name="status" defaultValue={filters.status ?? ''} className="w-full min-w-0 max-w-full truncate"><option value="">Semua status</option>{statuses.map((status) => <option key={status} value={status}>{status[0].toLocaleUpperCase('id-ID') + status.slice(1)}</option>)}</select></label>
       <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-4"><button className="min-h-10 rounded-lg bg-blue-700 px-4 text-white">Terapkan filter</button><Link href="/proker" className="inline-flex min-h-10 items-center rounded-lg border border-[var(--border)] px-4">Bersihkan</Link></div>
     </form>}
+    {dateCollisions.affectedCount > 0 && <details className="min-w-0 rounded-xl border border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+      <summary className="cursor-pointer list-inside p-4 font-medium">Terdapat {dateCollisions.affectedCount} proker yang dilaksanakan di tanggal yang sama.</summary>
+      <div className="grid gap-3 border-t border-amber-300 p-4 dark:border-amber-800">
+        {dateCollisions.collisions.map((collision) => <section key={`${collision.mulai}-${collision.selesai}-${collision.rows.map((row) => row.id).join('-')}`} className="grid min-w-0 gap-2">
+          <h2 className="font-semibold">{collision.mulai === collision.selesai ? tanggal(collision.mulai) : `${tanggal(collision.mulai)} – ${tanggal(collision.selesai)}`}</h2>
+          <ul className="grid min-w-0 gap-2 sm:grid-cols-2">
+            {collision.rows.map((row) => <li key={row.id} className="min-w-0 rounded-lg border border-amber-300 bg-[var(--page)] p-3 dark:border-amber-800"><Link href={`/proker/${row.id}`} className="break-words font-medium text-blue-800 underline dark:text-blue-300">{row.nama_kegiatan}</Link><p className="mt-1 text-sm">{teamName(row.tim_kerja_id)}</p><p className="text-sm">{dateLabel(row)}</p></li>)}
+          </ul>
+        </section>)}
+      </div>
+    </details>}
     {error || budgetResult.error ? <p role="alert" className="rounded-lg border border-red-300 p-4 text-red-700">Daftar proker tidak dapat dimuat. Muat ulang halaman.</p> : rows.length === 0 ? <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-[var(--muted)]">Belum ada proker</div> : <>
       <div className="grid min-w-0 max-w-full gap-3 md:hidden">{rows.map((row) => <article key={row.id} className="grid min-w-0 gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="flex min-w-0 flex-wrap items-start justify-between gap-2"><strong className="min-w-0 break-words">{row.nama_kegiatan}</strong><Badge status={row.status_efektif} /></div>{(isAdmin || isChair) && <p className="text-sm text-[var(--muted)] break-words">{teamName(row.tim_kerja_id)}</p>}<p className="text-sm break-words">{row.tahun_program} · {row.jenis[0].toLocaleUpperCase('id-ID') + row.jenis.slice(1)}</p><p className="text-sm break-words">{dateLabel(row)}</p><p className="text-sm break-words">Total anggaran: {formatRupiah(totalByProker.get(row.id) ?? '0.00')}</p><Link className="inline-flex min-h-10 items-center font-medium text-blue-700 dark:text-blue-300" href={`/proker/${row.id}`}>Lihat detail</Link></article>)}</div>
       <div className="hidden min-w-0 max-w-full overflow-x-auto rounded-xl border border-[var(--border)] md:block"><table className="w-full min-w-[760px] border-collapse text-left"><thead className="bg-[var(--surface)]"><tr>{['Tahun Program','Jenis','Nama Kegiatan',...((isAdmin || isChair) ? ['Tim Kerja'] : []),'Tanggal','Total Anggaran','Status',''].map((heading, index) => <th key={`${heading}-${index}`} className="border-b border-[var(--border)] px-3 py-3 text-sm font-semibold">{heading}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} className="bg-[var(--page)]"><td className="border-b border-[var(--border)] px-3 py-3">{row.tahun_program}</td><td className="border-b border-[var(--border)] px-3 py-3">{row.jenis[0].toLocaleUpperCase('id-ID') + row.jenis.slice(1)}</td><td className="border-b border-[var(--border)] px-3 py-3">{row.nama_kegiatan}</td>{(isAdmin || isChair) && <td className="border-b border-[var(--border)] px-3 py-3">{teamName(row.tim_kerja_id)}</td>}<td className="border-b border-[var(--border)] px-3 py-3">{dateLabel(row)}</td><td className="border-b border-[var(--border)] px-3 py-3">{formatRupiah(totalByProker.get(row.id) ?? '0.00')}</td><td className="border-b border-[var(--border)] px-3 py-3"><Badge status={row.status_efektif} /></td><td className="border-b border-[var(--border)] px-3 py-3"><Link href={`/proker/${row.id}`} className="font-medium text-blue-700 dark:text-blue-300">Detail</Link></td></tr>)}</tbody></table></div>
